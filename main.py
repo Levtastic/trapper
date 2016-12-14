@@ -3,24 +3,26 @@
 
 import sys, os
 
+from datetime import datetime
+
 from window import Window
 from cursor import Clip
 from ui import UI
 
 
 class App:
-    list_refresh_delay = 1 * 1000
-    clip_refresh_delay = 1 * 1000
+    refresh_delay = 500 # half a second
 
     def __init__(self):
         self.windows = {}
         self.selected_window = None
         self.current_clip = None
 
-        self.ui = ui = UI('Trapper', self.resourcePath, self.list_refresh_delay)
+        self.ui = ui = UI('Trapper', self.resourcePath, self.refresh_delay)
         ui.add_callback('getListOfWindows', self.getListOfWindows)
         ui.add_callback('changeSelectedWindow', self.changeSelectedWindow)
         ui.add_callback('clipCursor', self.clipCursor)
+        ui.add_callback('refreshClip', self.refreshClip)
         ui.add_callback('isClipped', self.isClipped)
 
     def __del__(self):
@@ -55,28 +57,36 @@ class App:
         elif self.selected_window:
             self.current_clip = Clip(self.selected_window.bounds)
             self.current_clip.clip()
-            self.ui.root.after(self.clip_refresh_delay, lambda: self.refreshClip(self.current_clip))
+            self.ui.root.after(self.refresh_delay, lambda: self.refreshClipLoop(self.current_clip))
 
             return True
 
         return False
 
-    def refreshClip(self, previous_clip):
+    def refreshClipLoop(self, previous_clip):
         if (not self.current_clip) or self.current_clip != previous_clip:
             return
 
+        if self.refreshClip():
+            self.ui.root.after(self.refresh_delay, lambda: self.refreshClipLoop(self.current_clip))
+
+    def refreshClip(self):
+        if (not self.current_clip):
+            return
+
         if (not self.selected_window) or (not self.selected_window.exists):
+            self.current_clip.release()
+            self.current_clip = None
             return
 
         window_bounds = self.selected_window.bounds
-        if previous_clip.bounds != window_bounds:
+        if self.current_clip.bounds != window_bounds:
             # window has moved, so get a new clip for the new coords
-            previous_clip.release()
+            self.current_clip.release()
             self.current_clip = Clip(window_bounds)
 
         self.current_clip.clip()
-        self.ui.root.after(self.clip_refresh_delay, lambda: self.refreshClip(self.current_clip))
-
+        
     def isClipped(self):
         return (self.selected_window and self.selected_window.exists
                 and self.current_clip and self.current_clip.clipped)

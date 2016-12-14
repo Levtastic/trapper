@@ -31,7 +31,7 @@ class UI:
 
         self.buttons.clip_button.configure(command=self.clip_button_clicked)
         self.list.results_listbox.bind('<<ListboxSelect>>', self.selection_changed)
-        self.root.after(1, self.refreshWindowList)
+        self.root.after(1, self.refreshWindowListLoop)
 
     @property
     def mainloop(self):
@@ -61,6 +61,7 @@ class UI:
 
     def refreshIfClipped(self, is_clipped = None):
         if is_clipped is None:
+            self.run_callback('refreshClip')
             is_clipped = self.run_callback('isClipped')
 
         button = self.buttons.clip_button
@@ -93,6 +94,10 @@ class UI:
 
         clipping = self.run_callback('changeSelectedWindow', value)
 
+    def refreshWindowListLoop(self):
+        self.refreshWindowList()
+        self.root.after(self.list_refresh_delay, self.refreshWindowListLoop)
+
     def refreshWindowList(self):
         listbox = self.list.results_listbox
         label = self.list.results_label
@@ -115,8 +120,6 @@ class UI:
             listbox.config(state=DISABLED)
 
         self.refreshIfClipped()
-
-        self.root.after(self.list_refresh_delay, self.refreshWindowList)
 
 
 class Section(Frame):
